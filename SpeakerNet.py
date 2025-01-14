@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy, sys, random
 import time, itertools, importlib
+import soundfile
 
 from DatasetLoader import test_dataset_loader
 from torch.cuda.amp import autocast, GradScaler
@@ -167,17 +168,20 @@ class ModelTrainer(object):
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=nDataLoaderThread, drop_last=False, sampler=sampler)
 
         ## Extract features for every image
-        for idx, data in enumerate(test_loader):
-            inp1 = data[0][0].cuda()
-            with torch.no_grad():
-                ref_feat = self.__model__(inp1).detach().cpu()
-            feats[data[1][0]] = ref_feat
-            telapsed = time.time() - tstart
+        try:
+            for idx, data in enumerate(test_loader):
+                inp1 = data[0][0].cuda()
+                with torch.no_grad():
+                    ref_feat = self.__model__(inp1).detach().cpu()
+                feats[data[1][0]] = ref_feat
+                telapsed = time.time() - tstart
 
-            if idx % print_interval == 0 and rank == 0:
-                sys.stdout.write(
-                    "\rReading {:d} of {:d}: {:.2f} Hz, embedding size {:d}".format(idx, test_loader.__len__(), idx / telapsed, ref_feat.size()[1])
-                )
+                if idx % print_interval == 0 and rank == 0:
+                    sys.stdout.write(
+                        "\rReading {:d} of {:d}: {:.2f} Hz, embedding size {:d}".format(idx, test_loader.__len__(), idx / telapsed, ref_feat.size()[1])
+                    )
+        except soundfile.LibsndfileError:
+            print(f"Failed at {idx=}")
 
         all_scores = []
         all_labels = []
